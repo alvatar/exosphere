@@ -1,18 +1,37 @@
 // TODO: take into account different decimals in the tokens
 // TODO: checks
+// TODO: withdraw
 
 use near_contract_standards::fungible_token::{metadata::FungibleTokenMetadata,
+					      receiver::FungibleTokenReceiver,
 					      FungibleToken};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::U128;
-use near_sdk::{env, near_bindgen, AccountId};
+use near_sdk::{env, near_bindgen, AccountId, PromiseOrValue};
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Exosphere {
     // Accounts deposits on the contract
     pub tokens: LookupMap<AccountId, (FungibleToken, FungibleTokenMetadata)>,
+}
+
+// Use FT.ft_transfer_call to send tokens from FT to pool
+#[near_bindgen]
+impl FungibleTokenReceiver for Exosphere {
+    fn ft_on_transfer(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+        #[allow(unused_variables)] msg: String,
+    ) -> PromiseOrValue<U128> {
+        let token_name = &env::predecessor_account_id();
+        let mut token = self.tokens.get(token_name).expect("Token not supported");
+        token.0.internal_deposit(&sender_id, amount.0);
+        self.tokens.insert(token_name, &token);
+        PromiseOrValue::Value(U128::from(0_u128))
+    }
 }
 
 #[near_bindgen]
